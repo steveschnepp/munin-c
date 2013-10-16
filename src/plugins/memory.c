@@ -127,20 +127,21 @@ int memory(int argc, char **argv) {
 		}
 
 		if(!strcmp(key, "MemTotal:"))
-			mem_total = value * 1024;
+			mem_total = value;
 		else if(!strcmp(key, "MemFree:"))
-			mem_free = value * 1024;
+			mem_free = value;
 		else if(!strcmp(key, "SwapTotal:"))
-			swap_total = value * 1024;
+			swap_total = value;
 		else if(!strcmp(key, "SwapFree:"))
-			swap_free = value * 1024;
+			swap_free = value;
 	}
 	fclose(f);
+
 	if(mem_total < 0 || mem_free < 0 || swap_total < 0 || swap_free < 0)
 		return fail("missing fileds in " PROC_MEMINFO);
 
-	printf("apps.value %ld\n", mem_total - mem_free);
-	printf("free.value %ld\n", mem_free);
-	printf("swap.value %ld\n", swap_total - swap_free);
+	printf("apps.value %ld\n", (mem_total - mem_free) * 1024);
+	printf("free.value %ld\n", mem_free * 1024);
+	printf("swap.value %ld\n", (swap_total - swap_free) * 1024);
 	return 0;
 }
