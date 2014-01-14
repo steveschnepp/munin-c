@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <dirent.h>
@@ -22,75 +23,105 @@
 
 
 static const int yes = 1;
+static const int no = 0;
 
 static int verbose = 0;
 static int extension_stripping = 0;
 
 static char* host = "";
-static unsigned short port = 0;
-static char* ip_bind_as_str = NULL;
 static char* plugin_dir = PLUGINDIR;
 static char* spoolfetch_dir = "";
+static char* client_ip = NULL;
 
 static int handle_connection();
 
-static int find_plugin_with_basename(char *cmdline, char *plugin_dir, char *plugin_basename) {
-       DIR* dirp = opendir(plugin_dir);
-       struct dirent* dp;
-       int found = 0;
+static void oom_handler() {
+	static const char* OOM_MSG = "Out of memory\n";
 
-       /* Empty cmdline */
-       cmdline[0] = '\0';
-
-       while ((dp = readdir(dirp)) != NULL) {
-               char* plugin_filename = dp->d_name;
-               int plugin_basename_len = strlen(plugin_basename);
-
-               if (plugin_filename[0] == '.') {
-                       /* No dotted plugin */
-                       continue;
-               }
-
-               if (strncmp(plugin_filename, plugin_basename, plugin_basename_len) != 0) {
-                       /* Does not start with base */
-                       continue;
-               }
-
-               if (plugin_filename[plugin_basename_len] != '\0' && plugin_filename[plugin_basename_len] != '.') {
-                       /* Does not end the string or start an extension */
-                       continue;
-               }
-
-               snprintf(cmdline, LINE_MAX, "%s/%s", plugin_dir, plugin_filename);
-               if (access(cmdline, X_OK) == 0) {
-                       /* Found it */
-                       found ++;
-                       break;
-               }
-       }
-       closedir(dirp);
-
-       return found;
+	/* write w/o return check. we are torched anyway */
+	write(STDOUT_FILENO, OOM_MSG, sizeof(OOM_MSG)-1);
+	abort();
 }
+
+/* an allocation bigger than MAX_ALLOC_SIZE is bogus */
+#define MAX_ALLOC_SIZE (16 * 1024 * 1024)
+static void* xmalloc(size_t size) {
+	void* ptr;
+
+	assert(size < MAX_ALLOC_SIZE);
+
+	ptr = malloc(size);
+	if (ptr == NULL) oom_handler();
+	return ptr;
+}
+
+static char* xstrdup(const char* s) {
+	char* new_str;
+
+	assert(s != NULL);
+	assert(strlen(s) < MAX_ALLOC_SIZE);
+	new_str = strdup(s);
+	if (new_str == NULL) oom_handler();
+	return new_str;
+}
+
+static int find_plugin_with_basename(/*@out@*/ char *cmdline,
+		const char *plugin_dir, const char *plugin_basename) {
+	DIR* dirp = opendir(plugin_dir);
+	struct dirent* dp;
+	int found = 0;
+	size_t plugin_basename_len = strlen(plugin_basename);
+
+	if (dirp == NULL) {
+		perror("Cannot open plugin dir");
+		return(found);
+	}
+
+	/* Empty cmdline */
+	cmdline[0] = '\0';
+
+	while ((dp = readdir(dirp)) != NULL) {
+		char* plugin_filename = dp->d_name;
+
+		if (plugin_filename[0] == '.') {
+			/* No dotted plugin */
+			continue;
+		}
+
+		if (strncmp(plugin_filename, plugin_basename, plugin_basename_len) != 0) {
+			/* Does not start with base */
+			continue;
+		}
+
+		if (plugin_filename[plugin_basename_len] != '\0' && plugin_filename[plugin_basename_len] != '.') {
+			/* Does not end the string or start an extension */
+			continue;
+		}
+
+		snprintf(cmdline, LINE_MAX, "%s/%s", plugin_dir, plugin_filename);
+		if (access(cmdline, X_OK) == 0) {
+			/* Found it */
+			found ++;
+			break;
+		}
+	}
+	closedir(dirp);
+
+	return found;
+}
+
+static void setenvvars_system(void);
 
 int main(int argc, char *argv[]) {
 
 	int optch;
 	extern int opterr;
-	int optarg_len;
-
-	char* buf;
 
 	char format[] = "evd:H:s:l:";
 
-	struct sockaddr_in server;
 	struct sockaddr_in client;
 
 	socklen_t client_len = sizeof(client);
-
-	int sock_listen;
-	int sock_accept;
-
 
 	opterr = 1;
 
@@ -103,102 +134,84 @@ int main(int argc, char *argv[]) {
 			verbose ++;
 			break;
 		case 'd':
-			optarg_len = strlen(optarg);
-			plugin_dir = (char *) malloc(optarg_len + 1);
-			strcpy(plugin_dir, optarg);
+			plugin_dir = xstrdup(optarg);
 			break;
 		case 'H':
-			optarg_len = strlen(optarg);
-			host = (char *) malloc(optarg_len + 1);
-			strcpy(host, optarg);
+			host = xstrdup(optarg);
 			break;
 		case 's':
-			optarg_len = strlen(optarg);
-			spoolfetch_dir = (char *) malloc(optarg_len + 1);
-			strcpy(spoolfetch_dir, optarg);
-			break;
-		case 'l':
-			optarg_len = strlen(optarg);
-			buf = strtok(optarg, ":");
-			if (buf) {
-				ip_bind_as_str = (char *) malloc(optarg_len + 1);
-				strcpy(ip_bind_as_str, optarg);
-				port = atoi(strtok(NULL, ":"));
-			} else {
-				port = atoi(optarg);
-			}
+			spoolfetch_dir = xstrdup(optarg);
 			break;
 	}
 
 	/* get default hostname if not precised */
-	if (! strlen(host)) {
-		host = (char *) malloc(HOST_NAME_MAX + 1);
+	if ('\0' == *host) {
+		host = xmalloc(HOST_NAME_MAX + 1);
 		gethostname(host, HOST_NAME_MAX);
 	}
 
-	if (! port) {
-		/* use a 1-shot stdin/stdout */
-		return handle_connection();
+	/* Prepare static plugin env vars once for all */
+	setenvvars_system();
+
+	/* use a 1-shot stdin/stdout */
+	client_ip = "-";
+	client_len = sizeof(client);
+	if(0 == getpeername(STDIN_FILENO, (struct sockaddr*)&client,
+				&client_len))
+		if(client.sin_family == AF_INET)
+			client_ip = inet_ntoa(client.sin_addr);
+	return handle_connection();
+}
+
+/* Setting munin specific vars */
+static void setenvvars_system() {
+	/* Some locales use "," as decimal separator.
+	 * This can mess up a lot of plugins. */
+	setenv("LC_ALL", "C", yes);
+
+	/* LC_ALL should be enough, but some plugins don't
+	 * follow specs (#1014) */
+	setenv("LANG", "C", yes);
+
+	/* PATH should be *very* sane by default. Can be
+	 * overrided via config file if needed
+	 * (Closes #863 and #1128).  */
+	setenv("PATH", "/usr/sbin:/usr/bin:/sbin:/bin", yes);
+}
+
+/* Setting munin specific vars */
+static void setenvvars_munin() {
+	/* munin-node will override this with the IP of the
+	 * connecting master */
+	if (client_ip && client_ip[0] != '\0') {
+		setenv("MUNIN_MASTER_IP", client_ip, no);
 	}
 
-	/* port is set, listen to this port and
-           handle clients, one at a time */
+	/* Tell plugins about supported capabilities */
+	setenv("MUNIN_CAP_MULTIGRAPH", "1", no);
 
-	/* Get a socket for accepting connections. */
-	if ((sock_listen = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		return(2);
-	}
+	/* We only have one user, so using a fixed path */
+	setenv("MUNIN_PLUGSTATE", "/var/tmp", no);
+	setenv("MUNIN_STATEFILE", "/dev/null", no);
 
-	/* Bind the socket to the server address. */
-	memset(&server, 0, sizeof(server));
-	server.sin_family = AF_INET;
-	server.sin_port = htons(port);
+	/* That's where plugins should live */
+	setenv("MUNIN_LIBDIR", "/usr/share/munin", no);
+}
 
-	if (! ip_bind_as_str) {
-		server.sin_addr.s_addr = INADDR_ANY;
-	} else {
-		server.sin_addr.s_addr = inet_addr(ip_bind_as_str);
-	}
-
-	if (setsockopt(sock_listen, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) { 
-		perror("setsockopt");
-	}
-
-	if (bind(sock_listen, (struct sockaddr*) &server, sizeof(server)) < 0) {
-		return(3);
-	}
-
-	/* Listen for connections. Specify the backlog as 1. */
-	if (listen(sock_listen, 1) != 0) {
-		return(4);
-	}
-
-	/* Accept a connection. */
-	while ((sock_accept = accept(sock_listen, (struct sockaddr*) &client, &client_len)) != -1) { 
-		/* connect the accept socket to stdio */
-		if (stdin != stdout) {
-			fclose(stdout);
-		}
-		fclose(stdin);
-		dup2(sock_accept, 0);
-		dup2(sock_accept, 1);
-
-		/* close socket after dup() */
-		close(sock_accept);
-
-		stdin = stdout = fdopen(0, "rb+");
-
-		if (handle_connection()) break;
-	}
-
-	return 5;
+/* Setting user configured vars */
+static void setenvvars_conf() {
+	/* TODO - add plugin conf parsing */
 }
 
 static int handle_connection() {
 	char line[LINE_MAX];
 
+	/* Prepare per connection plugin env vars */
+	setenvvars_munin();
+	setenvvars_conf();
+
 	printf("# munin node at %s\n", host);
-	while (fgets(line, LINE_MAX, stdin) != NULL) {
+	while (fflush(stdout), fgets(line, LINE_MAX, stdin) != NULL) {
 		char* cmd;
 		char* arg;
 
@@ -219,6 +232,10 @@ static int handle_connection() {
 			return(0);
 		} else if (strcmp(cmd, "list") == 0) {
 			DIR* dirp = opendir(plugin_dir);
+			if (dirp == NULL) {
+				printf("# Cannot open plugin dir\n");
+				return(0);
+			}
 			struct dirent* dp;
 			while ((dp = readdir(dirp)) != NULL) {
 				char cmdline[LINE_MAX];
@@ -242,7 +259,7 @@ static int handle_connection() {
 				}
 			}
 			closedir(dirp);
-			printf("%s", "\n");
+			putchar('\n');
 		} else if (
 				strcmp(cmd, "config") == 0 ||
 				strcmp(cmd, "fetch") == 0
@@ -278,7 +295,7 @@ static int handle_connection() {
 			printf(".\n");
 		} else if (strcmp(cmd, "cap") == 0) {
 			printf("cap ");
-			if (strlen(spoolfetch_dir)) {
+			if ('\0' != *spoolfetch_dir) {
 				printf("spool ");
 			}
 			printf("\n");
@@ -287,8 +304,6 @@ static int handle_connection() {
 		} else {
 			printf("# unknown cmd: %s\n", cmd);
 		}
-		/* Flushing everyting to avoid deadlocks */
-		fflush(NULL);
 	}
 
 	return 0;
