@@ -15,6 +15,16 @@
 
 @SET_MAKE@
 
+#
+# Copyright (C) 2013 Helmut Grohne <helmut@subdivi.de> - All rights reserved.
+# Copyright (C) 2013 Steve Schnepp <steve.schnepp@pwkf.org> - All rights reserved.
+# Copyright (C) 2013 Diego Elio Petteno <flameeyes@flameeyes.eu> - All rights reserved.
+#
+# This copyrighted material is made available to anyone wishing to use,
+# modify, copy, or redistribute it subject to the terms and conditions
+# of the GNU General Public License v.2 or v.3.
+#
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -650,8 +660,7 @@ install-dvi: install-dvi-recursive
 install-dvi-am:
 
 install-exec-am:
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
+
 install-html: install-html-recursive
 
 install-html-am:
@@ -693,7 +702,7 @@ ps-am:
 uninstall-am: uninstall-dist_docDATA
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
-	install-am install-exec-am install-strip tags-recursive
+	install-am install-strip tags-recursive
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
 	all all-am all-local am--refresh check check-am clean \
@@ -703,29 +712,23 @@ uninstall-am: uninstall-dist_docDATA
 	distcleancheck distdir distuninstallcheck dvi dvi-am html \
 	html-am info info-am install install-am install-data \
 	install-data-am install-dist_docDATA install-dvi \
-	install-dvi-am install-exec install-exec-am install-exec-hook \
-	install-html install-html-am install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
-	uninstall-dist_docDATA
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	installdirs-am maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags \
+	tags-recursive uninstall uninstall-am uninstall-dist_docDATA
 
 
 all-local: $(pkglibexec_PROGRAMS)
 	$(MKDIR_P) plugins
-	for l in `./src/plugins/munin-plugins-c listplugins`; do \
-		test -L plugins/$$l || $(LN_S) ../src/plugins/munin-plugins-c plugins/$$l; \
+	for l in `./src/plugins/munin-plugins-c$(EXEEXT) listplugins`; do \
+		test -L plugins/$$l$(EXEEXT) || $(LN_S) ../src/plugins/munin-plugins-c$(EXEEXT) plugins/$$l$(EXEEXT); \
 	done
 
 clean-local:
 	rm -rf plugins
-
-install-exec-hook:
-	for l in $(LINKS); do \
-		test -f $(DESTDIR)$(pkglibexecdir)$$l || $(LN_S) munin-plugins-c $(DESTDIR)$(pkglibexecdir)/$$l; \
-	done
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
