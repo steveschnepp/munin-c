@@ -1,0 +1,27 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://github.com/munin-monitoring/munin-c/
+Upstream-Name: munin-c
+Upstream-Contact: Helmut Grohne <helmut@subdivi.de>,
+                  Steve SCHNEPP <steve.schnepp@pwkf.org>
+
+Files: *
+Copyright: 2008-2013 Helmut Grohne <helmut@subdivi.de>,
+           2011-2013 Steve SCHNEPP <steve.schnepp@pwkf.org>
+           2013 Diego Elio Petteno <flameeyes@flameeyes.eu>
+License: GPL-2 or GPL-3
+
+Files: debian/*
+Copyright: 2013 Matthias Schmitz <matthias@sigxcpu.org>
+License: GPL-2 or GPL-3
+
+License: GPL-2
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.
+
+License: GPL-3
+ On Debian systems, the full text of the GNU General Public
+ License version 3 can be found in the file
+ `/usr/share/common-licenses/GPL-3'.
+
+

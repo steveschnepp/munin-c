@@ -1,0 +1,5 @@
+munin-c (0.0.7-1) unstable; urgency=low
+
+  * Initial release. (Closes: #719449)
+
+ -- Matthias Schmitz <matthias@sigxcpu.org>  Mon, 07 Oct 2013 21:46:54 +0200

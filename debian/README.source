@@ -1,0 +1,23 @@
+This package can be build with git-buildpackage.
+The source tarball can be downloaded with uscan.
+
+So building the package is:
+1. Clone the repo
+  gbp clone https://alioth.debian.org/anonscm/git/collab-maint/munin-c.git
+
+2. Change to the fresh cloned directory
+  cd munin-c
+
+3. Build with gbp
+  gbp buildpackage
+
+Upgrade to a new version:
+1. Check if a new version is available:
+  uscan --report --verbose
+
+2. Download new upstream tarball if there is a new version (e.g. 0.0.8)
+  uscan --download --verbose
+
+3. Import the tarball to the git repository
+  gbp import-orig ../munin-c_0.0.8.orig.tar.gz
+
