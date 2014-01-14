@@ -21,6 +21,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#if !(defined(HAVE_WORKING_VFORK) || defined(S_SPLINT_S))
+  #define vfork fork
+#endif
+
+#ifndef HOST_NAME_MAX
+  #define HOST_NAME_MAX 256
+#endif
 
 static const int yes = 1;
 static const int no = 0;
@@ -231,12 +238,12 @@ static int handle_connection() {
 		} else if (strcmp(cmd, "quit") == 0) {
 			return(0);
 		} else if (strcmp(cmd, "list") == 0) {
+			struct dirent* dp;
 			DIR* dirp = opendir(plugin_dir);
 			if (dirp == NULL) {
 				printf("# Cannot open plugin dir\n");
 				return(0);
 			}
-			struct dirent* dp;
 			while ((dp = readdir(dirp)) != NULL) {
 				char cmdline[LINE_MAX];
 				char* plugin_filename = dp->d_name;;

@@ -17,6 +17,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
+
+#if !(defined(HAVE_WORKING_VFORK) || defined(S_SPLINT_S))
+  #define vfork fork
+#endif
 
 int main(int argc, char *argv[]) {
 	static const int yes = 1;
@@ -69,13 +74,17 @@ int main(int argc, char *argv[]) {
 		close(sock_listen);
 		return 1;
 	}
+
+	/* We do *not* care about childs */
+	signal(SIGCHLD, SIG_IGN);
+
 	while((sock_accept = accept(sock_listen, NULL, NULL)) != -1) {
 		if(0 == (pid = vfork())) {
 			close(sock_listen);
 			dup2(sock_accept, 0);
 			dup2(sock_accept, 1);
 			close(sock_accept);
-			execvp(argv[2], argv + 2);
+			execvp(argv[2], argv + 3);
 			/* according to vfork(2) we must use _exit */
 			_exit(1);
 		} else {
