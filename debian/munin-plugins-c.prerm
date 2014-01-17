@@ -5,11 +5,10 @@ set -e
 case "$1" in
 
 remove)
-    for link in /etc/munin/plugins/*;
-
-
+    for plugin in /etc/munin/plugins/*;
     do
-
+        # no plugins at all then break
+        if [  $plugin = "/etc/munin/plugins/*" ]; then break; fi
 
         if [ $(readlink $plugin) = "/usr/lib/munin-c/plugins/munin-plugins-c" ];
         then
