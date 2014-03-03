@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Matthias Schmitz <matthias@sigxcpu.org>
 Build-Depends: debhelper (>= 9), dh-autoreconf, po-debconf
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: https://github.com/munin-monitoring/munin-c/
 Vcs-Git: git://anonscm.debian.org/collab-maint/munin-c.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/munin-c.git
