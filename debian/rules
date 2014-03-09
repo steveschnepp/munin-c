@@ -6,3 +6,7 @@
 
 %:
 	dh $@ --with autoreconf
+
+override_dh_auto_configure:
+	# enable verbose build logs
+	dh_auto_configure -- --disable-silent-rules
