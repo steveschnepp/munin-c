@@ -6,8 +6,8 @@
 .gdbinit
 tags
 TAGS
-/Makefile
-/Makefile.in
+Makefile
+Makefile.in
 /aclocal.m4
 /autom4te.cache/
 /build/
