@@ -109,6 +109,10 @@ int memory(int argc, char **argv) {
 			printf("swap.draw STACK\n");
 			printf("swap.info Swap space used.\n");
 
+			printf("total.label total\n");
+			printf("total.draw LINE2\n");
+			printf("total.info Physical memory.\n");
+
 			return 0;
 		}
 		if(!strcmp(argv[1], "autoconf"))
@@ -131,15 +135,18 @@ int memory(int argc, char **argv) {
 			mem_total = value * 1024;
 		else if(!strcmp(key, "MemFree:"))
 			mem_free = value * 1024;
+		else if(!strcmp(key, "Cached:"))
+			mem_free += value * 1024;
 		else if(!strcmp(key, "SwapTotal:"))
 			swap_total = value * 1024;
 		else if(!strcmp(key, "SwapFree:"))
 			swap_free = value * 1024;
 	}
 	fclose(f);
-	if(mem_total < 0 || mem_free < 0 || swap_total < 0 || swap_free < 0)
+	if(mem_total < 0 || mem_free == -1 || swap_total < 0 || swap_free < 0)
 		return fail("missing fileds in " PROC_MEMINFO);
 
+	printf("total.value %" PRIdFAST64 "\n", mem_total);
 	printf("apps.value %" PRIdFAST64 "\n", mem_total - mem_free);
 	printf("free.value %" PRIdFAST64 "\n", mem_free);
 	printf("swap.value %" PRIdFAST64 "\n", swap_total - swap_free);
